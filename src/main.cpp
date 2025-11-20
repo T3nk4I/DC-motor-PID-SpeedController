@@ -1,5 +1,12 @@
 #include <Arduino.h>
 #include <util/atomic.h>
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+
+#define SCREEN_WIDTH 128 // OLED display width, in pixels
+#define SCREEN_HEIGHT 64 // OLED display height, in pixels
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 
 #define R_Enable PD2
 #define L_Enable PD3
@@ -35,11 +42,9 @@ int Kp ;
 int Ki ;
 
 int PWM;
-
 float ang;
-
 float err;
-
+float current;
 
 
 
@@ -47,6 +52,22 @@ float err;
 
 void setup() {
   BTS7960.init();
+  Serial.begin(9600);
+  if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
+    Serial.println(F("SSD1306 allocation failed"));
+    while (true);
+  }
+  display.clearDisplay();
+  display.setCursor(0,0);
+}
+
+void oledWrite(String msg){
+  display.clearDisplay();
+  display.setTextSize(3);
+  display.setCursor(0,0);
+  display.setTextColor(WHITE);
+  display.println(msg);
+  display.display();
 }
 
 void loop() {
