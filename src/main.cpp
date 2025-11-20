@@ -46,9 +46,9 @@ float ang;
 float err;
 float current;
 
-
-
-
+int getCurrent(int pin) {
+  return analogRead(pin)/1024 * 8.5;
+}
 
 void setup() {
   BTS7960.init();
@@ -69,6 +69,7 @@ void oledWrite(String msg){
   display.println(msg);
   display.display();
 }
+
 
 void loop() {
 
