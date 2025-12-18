@@ -1,5 +1,6 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
+#include <AS5600.h>
 #include <Arduino.h>
 #include <Wire.h>
 #include <util/atomic.h>
@@ -23,7 +24,8 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 class Motor {
    public:
     void init() {
-        DDRD |= (1 << R_Enable) | (1 << L_Enable) | (1 << R_PWM) | (1 << L_PWM);
+        DDRD |= (1 << R_Enable) | (1 << L_Enable);
+        DDRB |= (1 << R_PWM) | (1 << L_PWM);
     }
 
     void move(byte A, char dir) {
@@ -40,25 +42,33 @@ class Motor {
 };
 
 // Global Variables
-int Kp;
-int Ki;
+float Kp = 0.8;
+float Ki = 1.2;
 
-int PWM;
-float ang;
-float err;
-float current;
+float targetRPM = 0, currentRPM = 0;
+float err = 0, lastError = 0;
+float integral = 0;
+float output = 0;
+
+unsigned long lastTime = 0;
 
 int counter = 0;
+int PWM;
+
 char direction;
 
+float current;
 int getCurrent(int pin) {
     return analogRead(pin) / 1024 * 8.5;
 }
 
 Motor BTS7960;
+AS5600 encoder;
 
 void setup() {
     Serial.begin(9600);
+    Wire.begin();
+
     BTS7960.init();
 
     pinMode(R_Enable, OUTPUT);
@@ -74,6 +84,11 @@ void setup() {
         Serial.println(F("SSD1306 allocation failed"));
         while (true);
     }
+    if (!encoder.begin()) {
+        Serial.println(F("AS5600 allocation failed"));
+        while (true);
+    }
+    
     display.clearDisplay();
     display.setCursor(0, 0);
     display.setTextColor(WHITE);
@@ -109,5 +124,21 @@ void loop() {
         direction = 'B';
     }
 
-    BTS7960.move(abs(counter), direction);
+    unsigned long currentTime = millis();
+    float dt = (currentTime - lastTime) / 1000.0;
+    
+    targetRPM = abs(counter);
+    currentRPM = encoder.getAngularSpeed(AS5600_MODE_RPM);
+
+    err = targetRPM - currentRPM;
+    if (abs(integral) < 255) {
+        integral += err * dt;
+    }
+
+    output = Kp * err + Ki * integral;
+
+    BTS7960.move(output, direction);
+
+    lastError = err;
+    lastTime = currentTime;
 }
